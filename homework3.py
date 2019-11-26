@@ -1,7 +1,8 @@
+import time
 from itertools import count
 import copy
 
-import time
+time1 = 0
 var_tracker = count()
 
 
@@ -10,7 +11,7 @@ def get_standardized_var():
     return 'x' + str(next(var_tracker))
 
 
-class Sentence:
+class SentenceClass:
     def __init__(self, sentence=None):
         self.input_s = sentence
         self.predicates_obj = []
@@ -29,48 +30,41 @@ class Sentence:
                 if i == 0 and '&' in idx:
                     temp_idx = idx.split('&')
                     for t_idx in temp_idx:
-                        self.premises_obj.append(Predicate(t_idx, self.implication))
+                        self.premises_obj.append(PredicateClass(t_idx, self.implication))
                 elif i == 0:
 
-                    self.premises_obj.append(Predicate(idx, self.implication))
+                    self.premises_obj.append(PredicateClass(idx, self.implication))
                 else:
 
-                    self.conclusion_obj.append(Predicate(idx, self.implication))
+                    self.conclusion_obj.append(PredicateClass(idx, self.implication))
                 self.predicates_obj = self.premises_obj + self.conclusion_obj
 
-        # Add predicates if it's not implication
         else:
-            self.predicates_obj.append(Predicate(sentence, self.implication))
+            self.predicates_obj.append(PredicateClass(sentence, self.implication))
 
         # Eliminate implication
         if self.implication:
             for premise in self.premises_obj:
                 premise.negation = not premise.negation
 
-        # standardize var
         for predicate in self.predicates_obj:
             for i, argument in enumerate(predicate.constant_arguments):
                 if argument.isalpha() and argument.islower() and len(argument) == 1:
-                    if argument in self.seen_variables:
-                        predicate.constant_arguments[i] = self.seen_variables[argument]
-                    else:
+                    if argument not in self.seen_variables:
                         st_argument = get_standardized_var()
                         self.seen_variables[predicate.constant_arguments[i]] = st_argument
                         predicate.constant_arguments[i] = st_argument
+                    else:
+                        predicate.constant_arguments[i] = self.seen_variables[argument]
 
     def __eq__(self, other):
-
-        if len(self.predicates_obj) != len(other.predicates_obj):
-            return False
         f = 0
         for i in self.predicates_obj:
             for j in other.predicates_obj:
-                if i != j:
-                    continue
-                else:
+                if i == j:
                     f += 1
 
-        return f == len(self.predicates_obj)  # == len(other.predicates_obj)
+        return f == len(self.predicates_obj) == len(other.predicates_obj)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -89,7 +83,8 @@ class Sentence:
         for pred in self.predicates_obj:
             pred.dump_predicate()
 
-class Predicate:
+
+class PredicateClass:
     def __init__(self, sentence, implication):
         self.t_predicate = sentence.strip().split('(')[0].strip()
         self.implication = implication
@@ -105,7 +100,7 @@ class Predicate:
             self.constant_arguments[i] = arg.strip()
 
     def __ne__(self, other):
-        if self.predicate != other.predicate:
+        if self.t_predicate != other.t_predicate:
             return True
         if self.constant_arguments != other.constant_arguments:
             return True
@@ -114,43 +109,28 @@ class Predicate:
     def __eq__(self, other):
         return not self.__ne__(other)
 
-    def dump_predicate(self):
-        print(f"\nPredicate : {self.predicate}")
-        print(f"is_neg : {self.negation}")
-        print(f"args : {self.constant_arguments}")
-
 
 def predicate_copy(predicate, predicate_list):
-    """
-    if not isinstance(predicate, Predicate):
-        return []
+    l_1 = []
+    if not isinstance(predicate, PredicateClass):
+        return l_1
 
     new_pred = copy.deepcopy(predicate_list)
-    l_1 = []
     for x in new_pred:
         if x != predicate:
             l_1.append(x)
     return l_1
-    """
-    if isinstance(predicate, Predicate):
-        new_predicate_list = copy.deepcopy(predicate_list)
-        print(f"New predicate list : {new_predicate_list}")
-        return [x for x in new_predicate_list if x != predicate]
+
 
 def var_substitution(all_predicates, var_map):
-    """
     for predicate in all_predicates:
         for i in range(len(predicate.constant_arguments)):
             if not predicate.constant_arguments[i] in var_map:
                 continue
             predicate.constant_arguments[i] = var_map[predicate.constant_arguments[i]]
-    """
-    for predicate in all_predicates:
-        for i in range(len(predicate.constant_arguments)):
-            if predicate.constant_arguments[i] in var_map:
-                predicate.constant_arguments[i] = var_map[predicate.constant_arguments[i]]
 
-class KB:
+
+class KBClass:
     def __init__(self, sentences, queries):
         self.input_sentences = sentences
         self.queries = queries
@@ -160,11 +140,11 @@ class KB:
         self.add_to_kb = []
 
         for query in self.queries:
-            self.queries_obj.append(Sentence(query))
+            self.queries_obj.append(SentenceClass(query))
 
         # Add to KB
         for sentence in self.input_sentences:
-            temp_obj = Sentence(sentence)
+            temp_obj = SentenceClass(sentence)
             self.sentences_obj.append(temp_obj)
 
             for premise in temp_obj.predicates_obj:
@@ -173,8 +153,7 @@ class KB:
                     self.hash_map[premise.t_predicate].append(temp_obj)
                 elif premise.t_predicate not in self.hash_map:
                     self.hash_map[premise.t_predicate] = [temp_obj]
-        print(f"Hash map{self.hash_map}")
-        #print(f" RESULT : {self.ask()}!!!")
+
         self.result = self.ask()
 
     def variable_unification(self, var, x, theta):
@@ -199,7 +178,7 @@ class KB:
             return self.variable_unification(x, y, theta)
         elif isinstance(y, str) and y[0].isalpha() and y[0].islower():
             return self.variable_unification(y, x, theta)
-        elif isinstance(x, Predicate) and isinstance(y, Predicate):
+        elif isinstance(x, PredicateClass) and isinstance(y, PredicateClass):
             return self.unification(x.constant_arguments, y.constant_arguments,
                                     self.unification(x.predicate, y.predicate, theta))
         elif isinstance(x, list) and isinstance(y, list):
@@ -208,11 +187,11 @@ class KB:
             theta['fail'] = 1
             return theta
 
-    def resolution(self, y, x):
+    def resolution(self, x, y):
         temp_s = []
         for i in x.predicates_obj:
             for j in y.predicates_obj:
-                if (i.predicate == j.predicate) and (not (i.negation == j.negation)):
+                if (i.predicate == j.predicate) and not (i.negation == j.negation):
                     theta = {}
                     self.unification(i, j, theta)
                     if 'fail' not in theta:
@@ -221,13 +200,12 @@ class KB:
                         temp_2 = predicate_copy(j, y.predicates_obj[:])
                         var_substitution(temp_2, theta)
 
-                        # create sentence
-                        temp_obj = Sentence()
+                        temp_obj = SentenceClass()
                         for pred in temp_1:
                             if pred and not (pred in temp_obj):
                                 temp_obj.predicates_obj.append(pred)
                         for pred in temp_2:
-                            if pred and not(pred in temp_obj):
+                            if pred and not (pred in temp_obj):
                                 temp_obj.predicates_obj.append(pred)
 
                         temp_s.append(temp_obj)
@@ -244,16 +222,15 @@ class KB:
         sentences_list = []
         result = False
 
-        if time.time() - time1 > 50:
-            print(f"TIMED OUT!!")
+        if time.time() - time1 > 80:
             return False
 
         if not query or not query.predicates_obj:
             return True
+
         if t_count > 0:
             p_len = len(parent[:t_count - 1])
             if not self.loop_detection(parent, p_len):
-                print(f"Yo loop")
                 return False
 
         for pred in query.predicates_obj:
@@ -267,49 +244,42 @@ class KB:
 
         sentences_list += self.add_to_kb[:t_count]
 
-
         for sent in sentences_list:
 
-            resolved_sent = self.resolution(sent, query)
+            resolved_sent = self.resolution(query, sent)
 
             if not resolved_sent:
                 continue
 
-            print(f"\nResolved Sentences\n")
-            print("=================================================")
-            print(f"{resolved_sent[0].dump_sentences()}")
-            print("=================================================\n")
-
-            if len(self.add_to_kb) >= t_count + 1:
-                self.add_to_kb[t_count] = resolved_sent[0]
-            else:
-                self.add_to_kb.append(resolved_sent[0])
-
-            if len(parent) > t_count:
-                parent[t_count] = resolved_sent[0]
-            else:
-                parent.append(resolved_sent[0])
-
+            self.add_to_kb.append(resolved_sent[0])
+            parent.append(resolved_sent[0])
             result = self.query_resolution(resolved_sent[0], t_count + 1, parent)
             if result:
                 return True
 
-        if not result:
-            return result
+        return result
 
     def ask(self):
         result = []
         for query in self.queries_obj:
+            global time1
+            time1 = time.time()
             query.predicates_obj[0].negation = not query.predicates_obj[0].negation
+            self.add_to_kb = []
             self.add_to_kb.append(query)
-            result.append(self.query_resolution(query, 1, []))
+            try:
+                final_result = self.query_resolution(query, 1, [])
+            except:
+                final_result = False
+
+            result.append(final_result)
 
         return result
 
 
 if __name__ == '__main__':
 
-    with open('input.txt', 'r') as fp:
+    with open('input4.txt', 'r') as fp:
         query_count = int(fp.readline().strip())
         queries = []
         for i in range(query_count):
@@ -319,11 +289,9 @@ if __name__ == '__main__':
         sentences = []
         for i in range(sentence_count):
             sentences.append(fp.readline().strip())
-
-        time1 = time.time()
-        obj = KB(sentences, queries)
-
     fp.close()
+
+    obj = KBClass(sentences, queries)
 
     with open('output.txt', 'w+') as fp:
         for i, s in enumerate(obj.result):
